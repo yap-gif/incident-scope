@@ -1,4 +1,4 @@
-Oct  6 10:20:01 server-01 sshd[1234]: Failed password for admin from 203.0.113.20 port 54321 ssh2
+﻿Oct  6 10:20:01 server-01 sshd[1234]: Failed password for admin from 203.0.113.20 port 54321 ssh2
 Oct  6 10:20:05 server-01 sshd[1235]: Failed password for invalid user guest from 198.51.100.9 port 40000 ssh2
 Oct  6 10:21:00 server-01 sshd[1240]: Accepted publickey for admin from 203.0.113.20 port 54325 ssh2
 Oct  6 10:22:10 server-01 sshd[1250]: Invalid user oracle from 192.0.2.44 port 35555
