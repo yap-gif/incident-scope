@@ -2,17 +2,17 @@
 
 IncidentScope is a defensive security event analysis and incident investigation platform.
 
-It transforms raw security telemetry into normalized events that can later be evaluated by explainable detection rules, correlated into incidents, and reviewed through investigation timelines and structured reports.
+It transforms raw security telemetry into normalized events, evaluates those events with explainable detection rules, and produces structured security alerts that can later be correlated into incidents and investigation timelines.
 
 ## Status
 
-Milestone 1 — Normalized Event Engine: **Complete**
+Milestone 2 — Detection Engine: **Complete**
 
 Current test suite:
 
-- 19 automated tests passing
-- unit tests for domain models and parsers
-- integration tests for file ingestion
+- 79 automated tests passing
+- unit tests for domain models, parsers, detection rules, and engine behavior
+- integration tests for file ingestion and the complete default detection ruleset
 
 ## Current Capabilities
 
@@ -80,6 +80,99 @@ Current ingestion behavior:
 - Linux authentication logs require an explicit year
 - files are read using UTF-8 with optional BOM support
 
+### Detection Engine
+
+IncidentScope evaluates normalized events through a common `DetectionRule` contract.
+
+The `DetectionEngine`:
+
+- runs multiple registered rules against the same event collection
+- rejects duplicate rule IDs
+- collects generated alerts
+- returns alerts in deterministic chronological order
+- surfaces rule failures instead of silently suppressing them
+
+A canonical default ruleset provides the complete MVP rule configuration from one entry point.
+
+### Alert Model
+
+Detection rules produce structured `Alert` objects containing:
+
+- alert ID
+- rule ID
+- title
+- severity
+- description
+- first-seen and last-seen timestamps
+- source IP
+- affected user when applicable
+- supporting event IDs
+- explainable evidence
+- tags
+
+Alerts must contain at least one supporting event and cannot have a reversed time range.
+
+## Detection Rules
+
+### AUTH-001 — Repeated Authentication Failures
+
+Severity: `medium`
+
+Detects at least 5 Linux authentication failures from the same source IP within 60 seconds.
+
+### AUTH-002 — Successful Login After Failure Burst
+
+Severity: `high`
+
+Detects a successful Linux authentication after at least 3 failures from the same source IP within the preceding 120 seconds.
+
+### WEB-001 — Suspicious Administrative Path Probing
+
+Severity: `medium`
+
+Detects HTTP requests targeting known administrative or sensitive paths such as:
+
+- `/admin`
+- `/administrator`
+- `/wp-admin`
+- `/phpmyadmin`
+- `/.env`
+- `/server-status`
+
+Path matching is case-insensitive, ignores query strings and trailing slashes, and supports nested administrative paths.
+
+### WEB-002 — Repeated Authorization Failures
+
+Severity: `medium`
+
+Detects at least 5 HTTP access-control failures using status codes 401 or 403 from the same source IP within 60 seconds.
+
+### WEB-003 — Scanning-Like Path Enumeration
+
+Severity: `medium`
+
+Detects requests to at least 8 distinct denied or missing paths from the same source IP within 60 seconds.
+
+Relevant HTTP status codes:
+
+- 403
+- 404
+
+Path normalization prevents case changes, trailing slashes, or query strings from artificially increasing the unique-path count.
+
+### NET-001 — High-Frequency Source Activity
+
+Severity: `low`
+
+Detects at least 20 normalized events from the same source IP within 60 seconds.
+
+This rule can aggregate activity across both supported telemetry sources:
+
+- HTTP access events
+- Linux authentication events
+
+High-frequency activity is intentionally treated as a low-severity signal because high volume alone does not prove malicious behavior.
+
 ## Current Pipeline
 
     Raw Log File
@@ -88,11 +181,15 @@ Current ingestion behavior:
         ↓
     Source-Specific Parser
         ↓
-    Normalized Event
+    Normalized Event[]
         ↓
-    Event[]
+    DetectionEngine
+        ↓
+    DetectionRule[]
+        ↓
+    Alert[]
 
-Detection logic is intentionally not part of the ingestion layer.
+Incident correlation and investigation timelines are not implemented yet.
 
 ## Synthetic Sample Data
 
@@ -109,12 +206,24 @@ The sample IP addresses use documentation/example address ranges rather than pro
 - FastAPI
 - Pydantic
 - pytest
-- SQLite planned for later milestones
+- SQLite planned for a later milestone
 
 ## Project Structure
 
     app/
+    ├── detection/
+    │   ├── rules/
+    │   │   ├── auth_failures.py
+    │   │   ├── auth_success_after_failures.py
+    │   │   ├── net_high_frequency.py
+    │   │   ├── web_admin_probing.py
+    │   │   ├── web_authorization_failures.py
+    │   │   └── web_path_enumeration.py
+    │   ├── base.py
+    │   ├── defaults.py
+    │   └── engine.py
     ├── domain/
+    │   ├── alerts.py
     │   └── events.py
     ├── ingestion/
     │   ├── auth_parser.py
@@ -130,11 +239,21 @@ The sample IP addresses use documentation/example address ranges rather than pro
 
     tests/
     ├── integration/
-    │   └── test_batch_ingestion.py
+    │   ├── test_batch_ingestion.py
+    │   └── test_default_detection_engine.py
     ├── unit/
+    │   ├── test_alert_model.py
+    │   ├── test_auth_failures_rule.py
     │   ├── test_auth_parser.py
+    │   ├── test_auth_success_after_failures_rule.py
+    │   ├── test_detection_engine.py
+    │   ├── test_detection_rule_contract.py
     │   ├── test_event_model.py
-    │   └── test_http_parser.py
+    │   ├── test_http_parser.py
+    │   ├── test_net_high_frequency_rule.py
+    │   ├── test_web_admin_probing_rule.py
+    │   ├── test_web_authorization_failures_rule.py
+    │   └── test_web_path_enumeration_rule.py
     └── test_health.py
 
 ## Milestones
@@ -159,16 +278,34 @@ Implemented:
 
 ### Milestone 2 — Detection Engine
 
+Complete.
+
+Implemented:
+
+- structured Alert domain model
+- common DetectionRule contract
+- DetectionEngine orchestration
+- deterministic alert ordering
+- canonical default ruleset
+- AUTH-001
+- AUTH-002
+- WEB-001
+- WEB-002
+- WEB-003
+- NET-001
+- full six-rule integration testing
+
+### Milestone 3 — Incident Correlation
+
 Next.
 
-Initial planned rules:
+Planned direction:
 
-- `AUTH-001` — Repeated Authentication Failures
-- `AUTH-002` — Successful Login After Failure Burst
-- `WEB-001` — Suspicious Administrative Path Probing
-- `WEB-002` — Repeated Authorization Failures
-- `WEB-003` — Scanning-Like Path Enumeration
-- `NET-001` — High-Frequency Source Activity
+- correlate related alerts
+- create structured incidents
+- preserve supporting alert and event evidence
+- generate investigation timelines
+- avoid hiding uncertainty behind automatic conclusions
 
 ## Design Principles
 
