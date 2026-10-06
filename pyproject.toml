@@ -1,0 +1,19 @@
+[project]
+name = "incident-scope"
+version = "0.1.0"
+description = "Defensive security event analysis and incident investigation platform."
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "httpx",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
