@@ -86,6 +86,47 @@ Expected response:
 
 The installation flow, package import, complete test suite, Uvicorn startup, health endpoint, OpenAPI document, Swagger UI, and real HTTP analysis request have all been verified from a clean Python 3.13 virtual environment.
 
+## Canonical Security Demo
+
+IncidentScope includes a canonical Linux SSH authentication scenario that demonstrates the complete defensive analysis pipeline.
+
+The bundled sample contains:
+
+- five failed SSH authentication attempts
+- one subsequent successful SSH authentication
+- one source IP targeting the same user account
+
+With the API running, execute:
+
+```powershell
+python scripts\demo.py
+```
+
+Expected summary:
+
+```text
+IncidentScope Canonical Demo
+==============================
+Events: 6
+Alerts: AUTH-001, AUTH-002
+Incidents: 1
+Incident type: suspicious_authentication
+Severity: high
+Source IPs: 203.0.113.20
+Users: admin
+Timeline entries: 8
+```
+
+This demonstrates the full path from raw authentication telemetry through normalization, detection, incident correlation, and investigation timeline generation.
+
+The canonical input is stored at:
+
+```text
+samples/auth/suspicious-authentication.log
+```
+
+The demo client sends the sample through the public `POST /analyze` API rather than calling the analysis engine directly.
+
 ## Current Capabilities
 
 ### Normalized Event Model
