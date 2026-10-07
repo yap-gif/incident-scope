@@ -2,17 +2,17 @@
 
 IncidentScope is a defensive security event analysis and incident investigation platform.
 
-It transforms raw security telemetry into normalized events, evaluates those events with explainable detection rules, and produces structured security alerts that can later be correlated into incidents and investigation timelines.
+It transforms raw security telemetry into normalized events, evaluates those events with explainable detection rules, correlates related alerts into incidents, builds investigation timelines, and exposes the analysis pipeline through a FastAPI HTTP interface.
 
 ## Status
 
-Milestone 4 — Investigation Timeline and Reporting: **Complete**
+Milestone 5 — Analysis API: **Complete**
 
 Current test suite:
 
-- 140 automated tests passing
-- unit tests for domain models, ingestion, detection, correlation, timelines, and reports
-- integration tests for ingestion, detection, correlation, and the complete event-to-report pipeline
+- 160 automated tests passing
+- unit tests for domain models, ingestion, API contracts, detection, correlation, timelines, and reports
+- integration tests for ingestion, analysis services, API endpoints, failure semantics, correlation, reporting, and the complete public analysis pipeline
 
 ## Current Capabilities
 
@@ -146,6 +146,47 @@ The `CorrelationEngine`:
 
 A canonical default correlation engine provides the complete MVP correlation configuration from one entry point.
 
+### Analysis API
+
+IncidentScope exposes its analysis engine through FastAPI.
+
+The public analysis endpoint is:
+
+    POST /analyze
+
+The request contract supports:
+
+- `http_access` telemetry
+- `linux_auth` telemetry
+- raw in-memory log text
+- an explicit year for Linux authentication logs
+- configurable timezone offsets for Linux authentication timestamps
+
+The response is a structured `AnalysisResult` containing:
+
+- normalized events
+- detection alerts
+- correlated incidents
+- investigation timelines
+
+Request-schema validation failures return HTTP 422.
+
+Malformed log telemetry returns a structured HTTP 422 response containing:
+
+- `code`
+- `line_number`
+- parser `reason`
+
+Unexpected internal failures are not converted into client errors and remain server failures.
+
+FastAPI also exposes:
+
+- `/openapi.json`
+- `/docs`
+- `/health`
+
+The analysis endpoint intentionally does not generate analyst conclusions or `IncidentReport` objects automatically. Report generation remains a separate analyst-enriched workflow requiring an explicit conclusion and optional limitations.
+
 ### Investigation Timeline
 
 IncidentScope can transform incident evidence into a deterministic investigation timeline.
@@ -269,29 +310,47 @@ The resulting incident preserves supporting alert IDs and deduplicated event IDs
 
 ## Current Pipeline
 
-    Raw Log File
+Public analysis API:
+
+    HTTP JSON Request
         ↓
-    Line Reader
+    AnalyzeRequest
         ↓
-    Source-Specific Parser
+    In-Memory Log Ingestion
         ↓
     Normalized Event[]
         ↓
     DetectionEngine
         ↓
-    DetectionRule[]
-        ↓
     Alert[]
         ↓
     CorrelationEngine
-        ↓
-    CorrelationRule[]
         ↓
     Incident[]
         ↓
     Timeline Builder
         ↓
+    InvestigationTimeline[]
+        ↓
+    AnalysisResult
+        ↓
+    HTTP JSON Response
+
+The public `/analyze` endpoint executes this complete pipeline without writing uploaded telemetry to temporary files.
+
+For Linux authentication telemetry, the request supplies the missing syslog year and an optional timezone offset. HTTP access logs retain the timezone information already present in the log line.
+
+Malformed telemetry fails fast and preserves the physical source line number in a structured client-error response.
+
+Analyst-enriched reporting remains a separate workflow:
+
+    Incident
+        +
     InvestigationTimeline
+        +
+    Explicit Analyst Conclusion
+        +
+    Optional Limitations
         ↓
     Report Builder
         ↓
@@ -299,11 +358,9 @@ The resulting incident preserves supporting alert IDs and deduplicated event IDs
         ↓
     JSON
 
-The canonical MVP pipeline can transform normalized security telemetry into explainable alerts, correlate related alerts into incidents, construct evidence-backed investigation timelines, and produce deterministic machine-readable incident reports.
+This separation prevents the machine-analysis API from inventing compromise claims, attribution, analyst conclusions, or remediation.
 
-The implemented authentication scenario preserves evidence continuity from the six normalized source events through two supporting alerts, one correlated incident, eight timeline entries, and the final report JSON.
-
-Persistence, application APIs, and user interfaces are not implemented yet.
+Persistence, authentication, user accounts, and a frontend user interface are not implemented yet.
 
 ## Synthetic Sample Data
 
@@ -325,6 +382,13 @@ The sample IP addresses use documentation/example address ranges rather than pro
 ## Project Structure
 
     app/
+    |-- api/
+    |   |-- __init__.py
+    |   |-- contracts.py
+    |   `-- routes.py
+    |-- application/
+    |   |-- __init__.py
+    |   `-- analysis.py
     |-- correlation/
     |   |-- rules/
     |   |   `-- authentication.py
@@ -351,7 +415,8 @@ The sample IP addresses use documentation/example address ranges rather than pro
     |-- ingestion/
     |   |-- auth_parser.py
     |   |-- batch.py
-    |   `-- http_parser.py
+    |   |-- http_parser.py
+    |   `-- text.py
     |-- investigation/
     |   |-- report_builder.py
     |   `-- timeline_builder.py
@@ -365,6 +430,9 @@ The sample IP addresses use documentation/example address ranges rather than pro
 
     tests/
     |-- integration/
+    |   |-- test_analysis_api_pipeline.py
+    |   |-- test_analysis_service.py
+    |   |-- test_analyze_endpoint.py
     |   |-- test_batch_ingestion.py
     |   |-- test_default_correlation_engine.py
     |   |-- test_default_detection_engine.py
@@ -372,6 +440,7 @@ The sample IP addresses use documentation/example address ranges rather than pro
     |   `-- test_reporting_pipeline.py
     |-- unit/
     |   |-- test_alert_model.py
+    |   |-- test_api_contracts.py
     |   |-- test_auth_failures_rule.py
     |   |-- test_auth_parser.py
     |   |-- test_auth_success_after_failures_rule.py
@@ -386,6 +455,7 @@ The sample IP addresses use documentation/example address ranges rather than pro
     |   |-- test_incident_report_model.py
     |   |-- test_net_high_frequency_rule.py
     |   |-- test_report_builder.py
+    |   |-- test_text_ingestion.py
     |   |-- test_timeline_builder.py
     |   |-- test_timeline_model.py
     |   |-- test_web_admin_probing_rule.py
@@ -480,6 +550,46 @@ The implemented canonical authentication workflow demonstrates:
         -> JSON
 
 The next project milestone has not started. Its scope will be defined after this Milestone 4 closeout rather than expanding the MVP automatically.
+
+### Milestone 5 — Analysis API
+
+Complete.
+
+Implemented:
+
+- reusable analysis application service
+- in-memory HTTP access-log ingestion
+- in-memory Linux authentication-log ingestion
+- request validation through `AnalyzeRequest`
+- Linux auth year configuration
+- Linux auth timezone-offset configuration
+- `POST /analyze`
+- structured `AnalysisResult` responses
+- standalone-alert preservation
+- correlated incident and timeline responses
+- structured malformed-log HTTP 422 errors
+- physical source-line preservation in parse errors
+- parser-reason preservation
+- server-error separation from client errors
+- OpenAPI schema exposure
+- Swagger documentation exposure
+- end-to-end public API evidence-chain testing
+
+The canonical authentication API workflow demonstrates:
+
+    POST /analyze
+        -> 6 normalized Events
+        -> 2 Alerts
+        -> 1 Incident
+        -> 1 InvestigationTimeline
+        -> 8 Timeline entries
+        -> AnalysisResult JSON
+
+The public API preserves event IDs and alert IDs through correlation and investigation-timeline construction.
+
+`IncidentReport` generation remains separate because analyst conclusions and limitations must be supplied explicitly rather than generated automatically.
+
+The next project milestone has not started. Its scope will be selected after a new project re-baseline rather than automatically adding persistence, a frontend, or additional detection rules.
 
 ## Design Principles
 
