@@ -1,3 +1,10 @@
+[build-system]
+requires = [
+    "setuptools>=68",
+    "wheel",
+]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "incident-scope"
 version = "0.1.0"
@@ -17,3 +24,12 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.setuptools.packages.find]
+include = [
+    "app*",
+]
+exclude = [
+    "samples*",
+    "tests*",
+]
