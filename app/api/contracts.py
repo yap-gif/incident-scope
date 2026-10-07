@@ -41,3 +41,20 @@ class AnalyzeRequest(BaseModel):
             )
 
         return self
+
+
+class LogIngestionErrorDetail(BaseModel):
+    """Structured client error for malformed log telemetry."""
+
+    code: str = Field(
+        default="log_parse_error",
+        frozen=True,
+    )
+
+    line_number: int = Field(
+        ge=1
+    )
+
+    reason: str = Field(
+        min_length=1
+    )
