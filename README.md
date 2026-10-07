@@ -6,13 +6,13 @@ It transforms raw security telemetry into normalized events, evaluates those eve
 
 ## Status
 
-Milestone 3 — Incident Correlation: **Complete**
+Milestone 4 — Investigation Timeline and Reporting: **Complete**
 
 Current test suite:
 
-- 107 automated tests passing
-- unit tests for domain models, parsers, detection rules, correlation rules, and engine behavior
-- integration tests for file ingestion, default detection, default correlation, and the complete detection-to-correlation pipeline
+- 140 automated tests passing
+- unit tests for domain models, ingestion, detection, correlation, timelines, and reports
+- integration tests for ingestion, detection, correlation, and the complete event-to-report pipeline
 
 ## Current Capabilities
 
@@ -146,6 +146,43 @@ The `CorrelationEngine`:
 
 A canonical default correlation engine provides the complete MVP correlation configuration from one entry point.
 
+### Investigation Timeline
+
+IncidentScope can transform incident evidence into a deterministic investigation timeline.
+
+The timeline builder:
+
+- uses only alerts and events explicitly referenced by the incident
+- fails fast when required supporting evidence is missing
+- orders entries chronologically
+- places event evidence before alert evidence at equal timestamps
+- preserves direct references to event and alert evidence
+- normalizes open-ended detail fields into JSON-safe values
+
+Top-level timeline timestamps and evidence IDs remain strongly typed, while nested detail values use stable JSON-native representations.
+
+### Incident Report
+
+IncidentScope produces a versioned machine-readable `IncidentReport`.
+
+A report contains:
+
+- incident identity and type
+- severity and summary
+- first-seen and last-seen timestamps
+- source IPs and affected users
+- supporting alert IDs
+- supporting event IDs
+- the complete investigation timeline
+- an explicit analyst conclusion
+- explicit limitations
+
+The report validates that its timeline references the same incident and contains exactly the alert and event evidence declared by the report.
+
+Report generation does not automatically invent conclusions, attribution, compromise claims, or remediation. Analyst conclusions and limitations must be supplied explicitly.
+
+Report JSON output is deterministic for the same report object and supports exact JSON serialization and validation round-trips.
+
 ## Detection Rules
 
 ### AUTH-001 — Repeated Authentication Failures
@@ -251,10 +288,22 @@ The resulting incident preserves supporting alert IDs and deduplicated event IDs
     CorrelationRule[]
         ↓
     Incident[]
+        ↓
+    Timeline Builder
+        ↓
+    InvestigationTimeline
+        ↓
+    Report Builder
+        ↓
+    IncidentReport
+        ↓
+    JSON
 
-The canonical MVP pipeline can transform normalized authentication events into explainable alerts and then correlate those alerts into a suspicious-authentication incident while preserving supporting alert and event evidence.
+The canonical MVP pipeline can transform normalized security telemetry into explainable alerts, correlate related alerts into incidents, construct evidence-backed investigation timelines, and produce deterministic machine-readable incident reports.
 
-Investigation timelines, structured analyst reports, persistence, and user interfaces are not implemented yet.
+The implemented authentication scenario preserves evidence continuity from the six normalized source events through two supporting alerts, one correlated incident, eight timeline entries, and the final report JSON.
+
+Persistence, application APIs, and user interfaces are not implemented yet.
 
 ## Synthetic Sample Data
 
@@ -296,11 +345,16 @@ The sample IP addresses use documentation/example address ranges rather than pro
     |-- domain/
     |   |-- alerts.py
     |   |-- events.py
-    |   `-- incidents.py
+    |   |-- incidents.py
+    |   |-- reports.py
+    |   `-- timelines.py
     |-- ingestion/
     |   |-- auth_parser.py
     |   |-- batch.py
     |   `-- http_parser.py
+    |-- investigation/
+    |   |-- report_builder.py
+    |   `-- timeline_builder.py
     `-- main.py
 
     samples/
@@ -314,7 +368,8 @@ The sample IP addresses use documentation/example address ranges rather than pro
     |   |-- test_batch_ingestion.py
     |   |-- test_default_correlation_engine.py
     |   |-- test_default_detection_engine.py
-    |   `-- test_detection_correlation_pipeline.py
+    |   |-- test_detection_correlation_pipeline.py
+    |   `-- test_reporting_pipeline.py
     |-- unit/
     |   |-- test_alert_model.py
     |   |-- test_auth_failures_rule.py
@@ -328,7 +383,11 @@ The sample IP addresses use documentation/example address ranges rather than pro
     |   |-- test_event_model.py
     |   |-- test_http_parser.py
     |   |-- test_incident_model.py
+    |   |-- test_incident_report_model.py
     |   |-- test_net_high_frequency_rule.py
+    |   |-- test_report_builder.py
+    |   |-- test_timeline_builder.py
+    |   |-- test_timeline_model.py
     |   |-- test_web_admin_probing_rule.py
     |   |-- test_web_authorization_failures_rule.py
     |   `-- test_web_path_enumeration_rule.py
@@ -392,15 +451,35 @@ Implemented:
 
 ### Milestone 4 — Investigation Timeline and Reporting
 
-Next.
+Complete.
 
-Planned direction:
+Implemented:
 
-- derive chronological investigation timelines from incident evidence
-- preserve links between incidents, alerts, and normalized events
-- generate structured machine-readable incident reports
-- provide concise analyst-oriented findings without inventing unsupported conclusions
-- keep timeline and reporting logic independent from persistence and UI concerns
+- structured TimelineEntry domain model
+- structured InvestigationTimeline domain model
+- deterministic timeline construction
+- incident-scoped evidence resolution
+- missing-evidence fail-fast behavior
+- event-before-alert tie-breaking at equal timestamps
+- JSON-safe nested timeline details
+- structured IncidentReport version 1.0
+- report-to-timeline evidence integrity validation
+- explicit analyst conclusions
+- explicit report limitations
+- deterministic report JSON
+- exact JSON serialization round-trips
+- complete Event-to-Report integration testing
+
+The implemented canonical authentication workflow demonstrates:
+
+    6 normalized Events
+        -> 2 Alerts
+        -> 1 Incident
+        -> 8 Timeline entries
+        -> 1 IncidentReport
+        -> JSON
+
+The next project milestone has not started. Its scope will be defined after this Milestone 4 closeout rather than expanding the MVP automatically.
 
 ## Design Principles
 
