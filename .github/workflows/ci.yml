@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    name: Python 3.13 quality gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Upgrade packaging tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --upgrade setuptools wheel
+
+      - name: Install IncidentScope
+        run: |
+          python -m pip install -e ".[dev]"
+
+      - name: Check dependency consistency
+        run: |
+          python -m pip check
+
+      - name: Compile Python sources
+        run: |
+          python -m compileall -q app scripts
+
+      - name: Run automated tests
+        run: |
+          pytest -q
+
+      - name: Verify demo CLI
+        run: |
+          python scripts/demo.py --help
