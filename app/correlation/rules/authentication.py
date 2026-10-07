@@ -37,14 +37,19 @@ class SuspiciousAuthenticationCorrelationRule(CorrelationRule):
         )
 
         incidents: list[Incident] = []
+        used_failure_alert_ids = set()
 
         for success_alert in success_alerts:
             candidates = [
                 failure_alert
                 for failure_alert in failure_alerts
-                if self._is_match(
-                    failure_alert,
-                    success_alert,
+                if (
+                    failure_alert.alert_id
+                    not in used_failure_alert_ids
+                    and self._is_match(
+                        failure_alert,
+                        success_alert,
+                    )
                 )
             ]
 
@@ -61,6 +66,10 @@ class SuspiciousAuthenticationCorrelationRule(CorrelationRule):
                     alert.last_seen,
                     str(alert.alert_id),
                 ),
+            )
+
+            used_failure_alert_ids.add(
+                failure_alert.alert_id
             )
 
             incidents.append(

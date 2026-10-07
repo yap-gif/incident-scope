@@ -342,3 +342,55 @@ def test_multiple_success_alerts_create_independent_incidents() -> None:
     assert incidents[1].last_seen == (
         BASE_TIME + timedelta(seconds=120)
     )
+
+
+def test_failure_alert_is_consumed_at_most_once() -> None:
+    rule = SuspiciousAuthenticationCorrelationRule()
+
+    shared_failure_event = uuid4()
+
+    failure_alert = make_alert(
+        rule_id="AUTH-001",
+        first_seconds=0,
+        last_seconds=20,
+        event_ids=[shared_failure_event],
+    )
+
+    first_success_alert = make_alert(
+        rule_id="AUTH-002",
+        first_seconds=0,
+        last_seconds=30,
+        event_ids=[
+            shared_failure_event,
+            uuid4(),
+        ],
+    )
+
+    second_success_alert = make_alert(
+        rule_id="AUTH-002",
+        first_seconds=0,
+        last_seconds=40,
+        event_ids=[
+            shared_failure_event,
+            uuid4(),
+        ],
+    )
+
+    incidents = rule.correlate(
+        [
+            second_success_alert,
+            failure_alert,
+            first_success_alert,
+        ]
+    )
+
+    assert len(incidents) == 1
+
+    assert incidents[0].alert_ids == [
+        failure_alert.alert_id,
+        first_success_alert.alert_id,
+    ]
+
+    assert incidents[0].last_seen == (
+        BASE_TIME + timedelta(seconds=30)
+    )
