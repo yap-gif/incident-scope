@@ -14,6 +14,78 @@ Current test suite:
 - unit tests for domain models, ingestion, API contracts, detection, correlation, timelines, and reports
 - integration tests for ingestion, analysis services, API endpoints, failure semantics, correlation, reporting, and the complete public analysis pipeline
 
+## Quick Start
+
+IncidentScope requires Python 3.13 or newer.
+
+From the repository root, create and activate a virtual environment:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+Install IncidentScope together with its development dependencies:
+
+```powershell
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+```
+
+Verify the environment and run the complete automated test suite:
+
+```powershell
+python -m pip check
+pytest -q
+```
+
+The current verified baseline is:
+
+```text
+160 passed
+No broken requirements found.
+```
+
+Start the FastAPI application:
+
+```powershell
+python -m uvicorn app.main:app --reload
+```
+
+By default, the local service is available at:
+
+```text
+http://127.0.0.1:8000
+```
+
+Useful endpoints:
+
+```text
+GET  /health
+POST /analyze
+GET  /openapi.json
+GET  /docs
+```
+
+Verify the running service from another PowerShell session:
+
+```powershell
+Invoke-RestMethod `
+    -Uri "http://127.0.0.1:8000/health" `
+    -Method Get
+```
+
+Expected response:
+
+```json
+{
+  "status": "ok",
+  "service": "incident-scope"
+}
+```
+
+The installation flow, package import, complete test suite, Uvicorn startup, health endpoint, OpenAPI document, Swagger UI, and real HTTP analysis request have all been verified from a clean Python 3.13 virtual environment.
+
 ## Current Capabilities
 
 ### Normalized Event Model
