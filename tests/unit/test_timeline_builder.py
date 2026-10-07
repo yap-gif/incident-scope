@@ -389,11 +389,17 @@ def test_alert_entry_preserves_alert_evidence() -> None:
         "medium"
     )
     assert entry.details["first_seen"] == (
-        alert.first_seen
+        "2026-10-07T19:00:00Z"
     )
     assert entry.details["last_seen"] == (
-        alert.last_seen
+        "2026-10-07T19:00:20Z"
     )
+
+    assert entry.details[
+        "supporting_event_ids"
+    ] == [
+        str(event.event_id)
+    ]
 
 
 def test_builder_output_is_independent_of_input_order() -> None:
@@ -456,3 +462,125 @@ def test_builder_output_is_independent_of_input_order() -> None:
     ]
 
     assert first_refs == second_refs
+
+
+def test_timeline_details_are_json_round_trip_safe() -> None:
+    metadata_reference = uuid4()
+    evidence_reference = uuid4()
+
+    event = make_event(seconds=0)
+
+    event = event.model_copy(
+        update={
+            "metadata": {
+                "observed_at": BASE_TIME,
+                "reference_id": metadata_reference,
+                "nested": {
+                    "references": [
+                        metadata_reference,
+                    ],
+                },
+            },
+        }
+    )
+
+    alert = make_alert(
+        first_seconds=0,
+        last_seconds=20,
+        event_ids=[
+            event.event_id,
+        ],
+    )
+
+    alert = alert.model_copy(
+        update={
+            "evidence": {
+                "observed_at": (
+                    BASE_TIME
+                    + timedelta(seconds=20)
+                ),
+                "reference_id": evidence_reference,
+            },
+        }
+    )
+
+    incident = make_incident(
+        alert_ids=[
+            alert.alert_id,
+        ],
+        event_ids=[
+            event.event_id,
+        ],
+    )
+
+    timeline = build_investigation_timeline(
+        incident,
+        [alert],
+        [event],
+    )
+
+    event_entry = next(
+        entry
+        for entry in timeline.entries
+        if entry.entry_type == "event"
+    )
+
+    alert_entry = next(
+        entry
+        for entry in timeline.entries
+        if entry.entry_type == "alert"
+    )
+
+    assert event_entry.details[
+        "metadata"
+    ]["observed_at"] == (
+        "2026-10-07T19:00:00Z"
+    )
+
+    assert event_entry.details[
+        "metadata"
+    ]["reference_id"] == str(
+        metadata_reference
+    )
+
+    assert event_entry.details[
+        "metadata"
+    ]["nested"]["references"] == [
+        str(metadata_reference)
+    ]
+
+    assert alert_entry.details[
+        "first_seen"
+    ] == "2026-10-07T19:00:00Z"
+
+    assert alert_entry.details[
+        "last_seen"
+    ] == "2026-10-07T19:00:20Z"
+
+    assert alert_entry.details[
+        "supporting_event_ids"
+    ] == [
+        str(event.event_id)
+    ]
+
+    assert alert_entry.details[
+        "evidence"
+    ]["observed_at"] == (
+        "2026-10-07T19:00:20Z"
+    )
+
+    assert alert_entry.details[
+        "evidence"
+    ]["reference_id"] == str(
+        evidence_reference
+    )
+
+    serialized = timeline.model_dump_json()
+
+    restored = type(
+        timeline
+    ).model_validate_json(
+        serialized
+    )
+
+    assert restored == timeline

@@ -1,4 +1,8 @@
 from collections.abc import Sequence
+from datetime import datetime
+from enum import Enum
+from typing import Any
+from uuid import UUID
 
 from app.domain.alerts import Alert
 from app.domain.events import Event
@@ -110,21 +114,23 @@ def build_investigation_timeline(
 def _build_event_entry(
     event: Event,
 ) -> TimelineEntry:
-    details = {
-        "source_type": event.source_type,
-        "event_type": event.event_type,
-        "destination_ip": event.destination_ip,
-        "source_port": event.source_port,
-        "destination_port": event.destination_port,
-        "hostname": event.hostname,
-        "method": event.method,
-        "path": event.path,
-        "status_code": event.status_code,
-        "user_agent": event.user_agent,
-        "action": event.action,
-        "raw_event": event.raw_event,
-        "metadata": event.metadata,
-    }
+    details = _to_json_safe(
+        {
+            "source_type": event.source_type,
+            "event_type": event.event_type,
+            "destination_ip": event.destination_ip,
+            "source_port": event.source_port,
+            "destination_port": event.destination_port,
+            "hostname": event.hostname,
+            "method": event.method,
+            "path": event.path,
+            "status_code": event.status_code,
+            "user_agent": event.user_agent,
+            "action": event.action,
+            "raw_event": event.raw_event,
+            "metadata": event.metadata,
+        }
+    )
 
     return TimelineEntry(
         timestamp=event.timestamp,
@@ -155,16 +161,18 @@ def _build_event_entry(
 def _build_alert_entry(
     alert: Alert,
 ) -> TimelineEntry:
-    details = {
-        "rule_id": alert.rule_id,
-        "severity": alert.severity,
-        "first_seen": alert.first_seen,
-        "last_seen": alert.last_seen,
-        "supporting_event_ids": list(
-            alert.event_ids
-        ),
-        "evidence": alert.evidence,
-    }
+    details = _to_json_safe(
+        {
+            "rule_id": alert.rule_id,
+            "severity": alert.severity,
+            "first_seen": alert.first_seen,
+            "last_seen": alert.last_seen,
+            "supporting_event_ids": list(
+                alert.event_ids
+            ),
+            "evidence": alert.evidence,
+        }
+    )
 
     return TimelineEntry(
         timestamp=alert.last_seen,
@@ -183,3 +191,41 @@ def _build_alert_entry(
             *alert.tags,
         ],
     )
+
+
+def _to_json_safe(value: Any) -> Any:
+    """Convert nested timeline details to JSON-native values."""
+
+    if isinstance(value, datetime):
+        serialized = value.isoformat()
+
+        if serialized.endswith("+00:00"):
+            serialized = (
+                serialized[:-6]
+                + "Z"
+            )
+
+        return serialized
+
+    if isinstance(value, UUID):
+        return str(value)
+
+    if isinstance(value, Enum):
+        return _to_json_safe(
+            value.value
+        )
+
+    if isinstance(value, dict):
+        return {
+            str(key): _to_json_safe(item)
+            for key, item in value.items()
+        }
+
+    if isinstance(value, (list, tuple)):
+        return [
+            _to_json_safe(item)
+            for item in value
+        ]
+
+    return value
+
