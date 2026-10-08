@@ -4,6 +4,17 @@ All notable changes to IncidentScope are documented in this file.
 
 The project follows semantic versioning for release identifiers.
 
+## [0.1.1] - 2026-10-08
+
+### Added
+
+- MIT License (2026, YAP SHI XIAN).
+
+### Changed
+
+- Bumped package and FastAPI version to 0.1.1.
+- No functional changes to the detection or investigation pipeline.
+
 ## [0.1.0] - 2026-10-07
 
 ### Added

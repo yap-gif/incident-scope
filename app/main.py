@@ -9,7 +9,7 @@ app = FastAPI(
         "Defensive security event analysis "
         "and incident investigation platform."
     ),
-    version="0.1.0",
+    version="0.1.1",
 )
 
 app.include_router(api_router)
